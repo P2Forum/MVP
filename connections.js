@@ -95,7 +95,7 @@ class PeerConnectionManager {
                                              this.cw.getPubkeyFromId(peerId));
       if (!verified || Math.abs(connectionTime - req.data.combinedKeypair.connectionTime) > 2000 /* 2sec difference allowed*/) {
         // BAD!!!
-        this.connections[peerId].connection.close();
+        this.connections[peerId].webrtc.connection.close();
         console.log("signature doesn't match for peer",peerId)
         alert("signature doesn't match for peer "+peerId)
         this.connections[peerId].webrtc.handshakeStage = -1;
@@ -154,7 +154,7 @@ class PeerConnectionManager {
       // console.log("their data", this.connections[peerId].webrtc);
       if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
         // BAD!!!
-        this.connections[peerId].connection.close();
+        this.connections[peerId].webrtc.connection.close();
         console.log("signature doesn't match for peer",peerId)
         alert("signature doesn't match for peer "+peerId)
         this.connections[peerId].webrtc.handshakeStage = -1;
