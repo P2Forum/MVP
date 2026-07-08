@@ -86,6 +86,7 @@ class PeerConnectionManager {
   handleHandshake(peerId, req) {
     let connectionTime = Date.now();
     // let connectionTime =  Math.floor(Date.now() / 1000 * 2);
+    const connection = this.connections[peerId];
     let stage = this.connections[peerId].webrtc.handshakeStage;
     if (stage === 1) {
       // Phase 1, client B (receiver)
@@ -103,10 +104,10 @@ class PeerConnectionManager {
       }
       console.log("verified: ",verified);
       // ourKeypair
-      let theirChallenge = req.data.challenge;
-      let theirPubkey = req.data.combinedKeypair.pubkey;
-      let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
-      let nonce = this.cw.b64RandomBytes(64);
+      const theirChallenge = req.data.challenge;
+      const theirPubkey = req.data.combinedKeypair.pubkey;
+      const ourKeypair = this.connections[peerId].webrtc.ourKeypair;
+      const nonce = this.cw.b64RandomBytes(64);
 
       this.connections[peerId].webrtc.handshake.theirChallenge = theirChallenge;
 
@@ -144,6 +145,12 @@ class PeerConnectionManager {
       }
       this.connections[peerId].webrtc.handshakeStage = 3;
       this.sendPacket(response,peerId)
+
+      // start kill timer
+      setTimeout(() => {
+          if (!connection.webrtc.open)
+              connection.close();
+      }, 10000);
     } else if (stage === 2) {
       // Phase 2, client A
       //  - verify signed keypair nonce timestamp with the identity key
@@ -174,6 +181,7 @@ class PeerConnectionManager {
         console.log("challenge verification failed! - Aborting!")
         alert("challenge verification failed! - Aborting!")
         this.connections[peerId].webrtc.handshakeStage = -1;
+        this.connections[peerId].webrtc.connection.close();
         return;
       }
       // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
@@ -211,6 +219,7 @@ class PeerConnectionManager {
         console.log("challenge verification failed! - Aborting!")
         alert("challenge verification failed! - Aborting!")
         this.connections[peerId].webrtc.handshakeStage = -1;
+        this.connections[peerId].webrtc.connection.close();
         return;
       }
       //  - send "handshake finished" (signed)
