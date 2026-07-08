@@ -87,7 +87,7 @@ class PeerConnectionManager {
     let connectionTime = Date.now();
     // let connectionTime =  Math.floor(Date.now() / 1000 * 2);
     let stage = this.connections[peerId].webrtc.handshakeStage;
-    if (stage == 1) {
+    if (stage === 1) {
       // Phase 1, client B (receiver)
       //  - verify signed keypair nonce timestamp with the identity key
       let verified = this.cw.verifySignature(req.data.signedKeypair,
@@ -144,7 +144,7 @@ class PeerConnectionManager {
       }
       this.connections[peerId].webrtc.handshakeStage = 3;
       this.sendPacket(response,peerId)
-    } else if (stage == 2) {
+    } else if (stage === 2) {
       // Phase 2, client A
       //  - verify signed keypair nonce timestamp with the identity key
       let verified = this.cw.verifySignature(req.data.signedKeypair,
@@ -196,7 +196,7 @@ class PeerConnectionManager {
       this.sendPacket(response,peerId);
 
       this.connections[peerId].webrtc.handshakeStage = 4;
-    } else  if (stage == 3) {
+    } else  if (stage === 3) {
       // console.log("their peer info:",this.connections[peerId].webrtc)
       // Phase 3, client B
       //  - verify challenge response
@@ -224,7 +224,7 @@ class PeerConnectionManager {
       this.connections[peerId].webrtc.open = true;
       this.sendPacket(response,peerId);
 
-    } else if (stage == 4) {
+    } else if (stage === 4) {
       if (!req.data.isFinished) {
         console.log("something went wrong")
         return;
@@ -396,7 +396,6 @@ class PeerConnectionManager {
       data: {
         signedKeypair,
         combinedKeypair,
-        identityKey: this.cw.getIdentityKey(),
         challenge,
         version: this.version, 
       }
@@ -426,7 +425,7 @@ class PeerConnectionManager {
       //console.log('error:', err);
       console.log("error: ",err.type);
 
-      if (err.type == "peer-unavailable") {
+      if (err.type === "peer-unavailable") {
         console.log(err.toString())
         // let id = err.toString().match(/Could not connect to peer (.*)/)[1];
         // console.log(id);
