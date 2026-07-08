@@ -457,7 +457,7 @@ class PeerConnectionManager {
 
   // sends a Message to every connected peer
   sendMessage(Message) {
-    for (let peerId in this.connections) {
+    for (let peerId in this.connections.known_users) {
     // Object.keys(this.connections).forEach(async (peerId) => {
       this.sendDirectMessage(Message, peerId);
     // })
@@ -476,7 +476,6 @@ class PeerConnectionManager {
     // if you add iroh support, just add another check on iroh
     // here we check the handshake for webrtc
     // if iroh is incomplete, add a check there
-    console.log("connection object:",connection);
     if (connection.webrtc.handshakeStage <3) {
       console.log("handshake incomplete!");
       return;
