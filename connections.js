@@ -4,7 +4,7 @@ class PeerConnectionManager {
     // init with default options if needed
     options ??= this.getDefaultOptions();    
     // the version of the whole program
-    this.version = options.USERDATA.version;
+    this.version = options.USERDATA.VERSION;
     // list of the actual connections, and attributes about them
     // stored in subobjects, such as .webrtc, .iroh, etc.
     // This contains alive and dead connections
@@ -93,7 +93,7 @@ class PeerConnectionManager {
       let verified = this.cw.verifySignature(req.data.signedKeypair,
                                              this.cw.hash(JSON.stringify(req.data.combinedKeypair)),
                                              this.cw.getPubkeyFromId(peerId));
-      if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
+      if (!verified || Math.abs(connectionTime - req.data.combinedKeypair.connectionTime) > 2000 /* 2sec difference allowed*/) {
         // BAD!!!
         this.connections[peerId].connection.close();
         console.log("signature doesn't match for peer",peerId)
@@ -145,7 +145,6 @@ class PeerConnectionManager {
       this.connections[peerId].webrtc.handshakeStage = 3;
       this.sendPacket(response,peerId)
     } else if (stage == 2) {
-      this.connections[peerId].webrtc.handshakeStage = 4;
       // Phase 2, client A
       //  - verify signed keypair nonce timestamp with the identity key
       let verified = this.cw.verifySignature(req.data.signedKeypair,
@@ -170,6 +169,12 @@ class PeerConnectionManager {
       //  - verify challenge response
       let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
                                   === this.connections[peerId].webrtc.handshake.challenge;
+      if (!challengeVerification) {
+        // BAD!!
+        console.log("challenge verification failed! - Aborting!")
+        alert("challenge verification failed! - Aborting!")
+        this.connections[peerId].webrtc.handshakeStage = -1;
+      }
       // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
       //                                       this.connections[peerId].webrtc.handshake.challenge,
       //                                       this.cw.getPubkeyFromId(peerId));
@@ -190,6 +195,7 @@ class PeerConnectionManager {
       }
       this.sendPacket(response,peerId);
 
+      this.connections[peerId].webrtc.handshakeStage = 4;
     } else  if (stage == 3) {
       // console.log("their peer info:",this.connections[peerId].webrtc)
       // Phase 3, client B
@@ -199,6 +205,12 @@ class PeerConnectionManager {
       let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
       let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
                                   === this.connections[peerId].webrtc.handshake.challenge;
+      if (!challengeVerification) {
+        // BAD!!
+        console.log("challenge verification failed! - Aborting!")
+        alert("challenge verification failed! - Aborting!")
+        this.connections[peerId].webrtc.handshakeStage = -1;
+      }
       //  - send "handshake finished" (signed)
       let response = {
         type: "handshake",
@@ -478,6 +490,7 @@ class PeerConnectionManager {
         out.push(peerId);
       }
     }
+    return out;
   }
 
   // sends a Message to every connected peer
@@ -492,7 +505,7 @@ class PeerConnectionManager {
   // sends a Message directly to peerId, without using other peers as
   // intermediaries if possible
   sendDirectMessage(msgObj, peerId) {
-    if (!msgObj instanceof Message) {
+    if (!(msgObj instanceof Message)) {
       //sending raw data, convert to message
       return; //bad message
     }
@@ -591,11 +604,12 @@ class Message {
           creationDate: this.channel.creationDate,
           name: this.channel.name,
           description: this.channel.description,
-          peers: this.channel.peers
+          peers: this.Math.abs(channel.peers
         }
-      }])
+      }]))
     });
-    return packets;
-  }
-
+>   return packets|if (!challengeVerification) {
+  // BAD!!
+  console.log("challenge verification failed! - Aborting!")
+  console.log("challenge verification failed! - Aborting!")
 }
