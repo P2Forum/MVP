@@ -117,7 +117,7 @@ class PeerConnectionManager {
       // this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
       //  - sign challenge with ephemeral keypair
       //   - this ensures that keypair is known
-      let signedChallenge = this.cw.encryptMessage(theirChallenge, sharedKey);
+      let encryptedChallenge = this.cw.encryptMessage(theirChallenge, sharedKey);
       // good news: we've already initialized most of it, now just to add the missing data
       //  - sign (ephemeral keypair + nonce + timestamp) with identity keypair to establish identity
       //   - this prevents replay attacks
@@ -137,7 +137,7 @@ class PeerConnectionManager {
         data: {
           //  - send new challenge
           challenge,
-          signedChallenge,
+          encryptedChallenge,
           signedKeypair,
           //  - send signed ephemeral keypair, identity pubkey, and version
           combinedKeypair,
@@ -149,7 +149,7 @@ class PeerConnectionManager {
       // start kill timer
       setTimeout(() => {
           if (!connection.webrtc.open)
-              connection.close();
+              connection.webrtc.connection.close();
       }, 10000);
     } else if (stage === 2) {
       // Phase 2, client A
@@ -174,7 +174,7 @@ class PeerConnectionManager {
       this.connections[peerId].webrtc.sharedKey = sharedKey;
       this.connections[peerId].webrtc.handshake.theirChallenge = req.data.challenge;
       //  - verify challenge response
-      let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
+      let challengeVerification = this.cw.decryptMessage(req.data.encryptedChallenge, sharedKey)
                                   === this.connections[peerId].webrtc.handshake.challenge;
       if (!challengeVerification) {
         // BAD!!
@@ -184,11 +184,11 @@ class PeerConnectionManager {
         this.connections[peerId].webrtc.connection.close();
         return;
       }
-      // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
+      // let challengeVerification = this.cw.verifySignature(req.data.encryptedChallenge,
       //                                       this.connections[peerId].webrtc.handshake.challenge,
       //                                       this.cw.getPubkeyFromId(peerId));
       //  - sign new challenge with ephemeral keypair
-      let signedChallenge = this.cw.encryptMessage(req.data.challenge, sharedKey);
+      let encryptedChallenge = this.cw.encryptMessage(req.data.challenge, sharedKey);
 
 
       let response = {
@@ -199,7 +199,7 @@ class PeerConnectionManager {
         },
         data: {
           //  - send challenge response
-          signedChallenge,
+          encryptedChallenge,
         }
       }
       this.sendPacket(response,peerId);
@@ -212,7 +212,7 @@ class PeerConnectionManager {
       let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
       let theirPubkey = this.connections[peerId].webrtc.theirPublicKey;
       let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
-      let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
+      let challengeVerification = this.cw.decryptMessage(req.data.encryptedChallenge, sharedKey)
                                   === this.connections[peerId].webrtc.handshake.challenge;
       if (!challengeVerification) {
         // BAD!!
@@ -379,8 +379,8 @@ class PeerConnectionManager {
     let combinedKeypair = { pubkey: ourKeypair.publicKey, nonce, connectionTime };
     let signedKeypair = this.cw.signMessage(this.cw.hash(JSON.stringify(combinedKeypair)));
     this.connections[peerId] ??= {};
-    this.connections[peerId].callbacks = {};
-    this.connections[peerId].webrtc = {
+    this.connections[peerId].callbacks ??= {};
+    this.connections[peerId].webrtc ??= {
       connection: dataConnection,
       // we change the stage number so that we can use it to handle the handshake
       // requests elegantly -- if it's even, it's initator, if odd, it's not
@@ -497,7 +497,7 @@ class PeerConnectionManager {
   }
 
   // lists all connected peers
-  listConnections(peerId) {
+  listConnections() {
     let out = [];
     for (let peerId in this.connections.known_users) {
       if (this.connections.known_users[peerId].isAlive) {
