@@ -66,149 +66,7 @@ class PeerConnectionManager {
   getDefaultHandlers() {
     return {
       'handshake': (peerId, req) => {
-        let connectionTime = Date.now();
-        // let connectionTime =  Math.floor(Date.now() / 1000 * 2);
-        let stage = this.connections[peerId].webrtc.handshakeStage;
-        if (stage == 1) {
-          // Phase 1, client B (receiver)
-          //  - verify signed keypair nonce timestamp with the identity key
-          let verified = this.cw.verifySignature(req.data.signedKeypair,
-                                                 this.cw.hash(JSON.stringify(req.data.combinedKeypair)),
-                                                 this.cw.getPubkeyFromId(peerId));
-          if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
-            // BAD!!!
-            this.connections[peerId].connection.close();
-            console.log("signature doesn't match for peer",peerId)
-            alert("signature doesn't match for peer "+peerId)
-            this.connections[peerId].webrtc.handshakeStage = -1;
-            return;
-          }
-          console.log("verified: ",verified);
-          console.log("connection:",this.connections[peerId].webrtc);
-          // ourKeypair
-          let theirChallenge = req.data.challenge;
-          let theirPubkey = req.data.combinedKeypair.pubkey;
-          let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
-          let nonce = this.cw.b64RandomBytes(64);
-
-          this.connections[peerId].webrtc.handshake.theirChallenge = theirChallenge;
-
-          this.connections[peerId].webrtc.theirPublicKey = theirPubkey;
-          let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
-          this.connections[peerId].webrtc.sharedKey = sharedKey;
-          // this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
-          //  - sign challenge with ephemeral keypair
-          //   - this ensures that keypair is known
-          let signedChallenge = this.cw.encryptMessage(theirChallenge, sharedKey);
-          // good news: we've already initialized most of it, now just to add the missing data
-          //  - sign (ephemeral keypair + nonce + timestamp) with identity keypair to establish identity
-          //   - this prevents replay attacks
-          let combinedKeypair = { pubkey: ourKeypair.publicKey, nonce, connectionTime };
-          let signedKeypair = this.cw.signMessage(this.cw.hash(JSON.stringify(combinedKeypair)));
-          //  - generate random challenge
-          let challenge = this.cw.b64RandomBytes(64);
-          this.connections[peerId].webrtc.handshake.challenge = challenge;
-          // Phase 2, client B
-          //  - send challenge response
-          let response = {
-            type: "handshake",
-            status: {
-              code: 100,
-              message: "continuing to phase 2",
-            },
-            data: {
-              //  - send new challenge
-              challenge,
-              signedChallenge,
-              signedKeypair,
-              //  - send signed ephemeral keypair, identity pubkey, and version
-              combinedKeypair,
-            }
-          }
-          this.connections[peerId].webrtc.handshakeStage = 3;
-          this.sendPacket(response,peerId)
-        } else if (stage == 2) {
-          this.connections[peerId].webrtc.handshakeStage = 4;
-          // Phase 2, client A
-          //  - verify signed keypair nonce timestamp with the identity key
-          let verified = this.cw.verifySignature(req.data.signedKeypair,
-                                                 this.cw.hash(JSON.stringify(req.data.combinedKeypair)),
-                                                 this.cw.getPubkeyFromId(peerId));
-          console.log("verified stage 2:",verified)
-          // console.log("their data", this.connections[peerId].webrtc);
-          if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
-            // BAD!!!
-            this.connections[peerId].connection.close();
-            console.log("signature doesn't match for peer",peerId)
-            alert("signature doesn't match for peer "+peerId)
-            this.connections[peerId].webrtc.handshakeStage = -1;
-            return;
-          }
-          let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
-          let theirPubkey = req.data.combinedKeypair.pubkey;
-          this.connections[peerId].webrtc.theirPublicKey = theirPubkey;
-          let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
-          this.connections[peerId].webrtc.sharedKey = sharedKey;
-          this.connections[peerId].webrtc.handshake.theirChallenge = req.data.challenge;
-          //  - verify challenge response
-          let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
-                                      === this.connections[peerId].webrtc.handshake.challenge;
-          // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
-          //                                       this.connections[peerId].webrtc.handshake.challenge,
-          //                                       this.cw.getPubkeyFromId(peerId));
-          //  - sign new challenge with ephemeral keypair
-          let signedChallenge = this.cw.encryptMessage(req.data.challenge, sharedKey);
-
-
-          let response = {
-            type: "handshake",
-            status: {
-              code: 100,
-              message: "continuing to phase 3",
-            },
-            data: {
-              //  - send challenge response
-              signedChallenge,
-            }
-          }
-          this.sendPacket(response,peerId);
-          
-        } else  if (stage == 3) {
-          // console.log("their peer info:",this.connections[peerId].webrtc)
-          // Phase 3, client B
-          //  - verify challenge response
-          let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
-          let theirPubkey = this.connections[peerId].webrtc.theirPublicKey;
-          let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
-          let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
-                                      === this.connections[peerId].webrtc.handshake.challenge;
-          console.log("challenge all good")
-          //  - send "handshake finished" (signed)
-          let response = {
-            type: "handshake",
-            status: {
-              code: 200,
-              message: "Connection open and ready",
-            },
-            data: { isFinished: true }
-          }
-          //  - mark connection as open and alive
-          this.connections[peerId].webrtc.open = true;
-          this.sendPacket(response,peerId);
-          
-        } else if (stage == 4) {
-          if (!req.data.isFinished) {
-            console.log("something went wrong")
-            return;
-          }
-          this.connections[peerId].webrtc.open = true;
-          console.log("handshake finished")
-        }
-
-        // Phase 3, client A
-        //  - receive "handshake finished" (signed)
-        //  - mark connection as open and alive
-        
+        this.handleHandshake(peerId, req);
       },
       'ping': (peerId, req) => {
         console.log('got ping from', peerId);
@@ -216,6 +74,149 @@ class PeerConnectionManager {
     }
   }
 
+  handleHandshake(peerId, req) {
+    let connectionTime = Date.now();
+    // let connectionTime =  Math.floor(Date.now() / 1000 * 2);
+    let stage = this.connections[peerId].webrtc.handshakeStage;
+    if (stage == 1) {
+      // Phase 1, client B (receiver)
+      //  - verify signed keypair nonce timestamp with the identity key
+      let verified = this.cw.verifySignature(req.data.signedKeypair,
+                                             this.cw.hash(JSON.stringify(req.data.combinedKeypair)),
+                                             this.cw.getPubkeyFromId(peerId));
+      if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
+        // BAD!!!
+        this.connections[peerId].connection.close();
+        console.log("signature doesn't match for peer",peerId)
+        alert("signature doesn't match for peer "+peerId)
+        this.connections[peerId].webrtc.handshakeStage = -1;
+        return;
+      }
+      console.log("verified: ",verified);
+      // ourKeypair
+      let theirChallenge = req.data.challenge;
+      let theirPubkey = req.data.combinedKeypair.pubkey;
+      let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
+      let nonce = this.cw.b64RandomBytes(64);
+
+      this.connections[peerId].webrtc.handshake.theirChallenge = theirChallenge;
+
+      this.connections[peerId].webrtc.theirPublicKey = theirPubkey;
+      let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
+      this.connections[peerId].webrtc.sharedKey = sharedKey;
+      // this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
+      //  - sign challenge with ephemeral keypair
+      //   - this ensures that keypair is known
+      let signedChallenge = this.cw.encryptMessage(theirChallenge, sharedKey);
+      // good news: we've already initialized most of it, now just to add the missing data
+      //  - sign (ephemeral keypair + nonce + timestamp) with identity keypair to establish identity
+      //   - this prevents replay attacks
+      let combinedKeypair = { pubkey: ourKeypair.publicKey, nonce, connectionTime };
+      let signedKeypair = this.cw.signMessage(this.cw.hash(JSON.stringify(combinedKeypair)));
+      //  - generate random challenge
+      let challenge = this.cw.b64RandomBytes(64);
+      this.connections[peerId].webrtc.handshake.challenge = challenge;
+      // Phase 2, client B
+      //  - send challenge response
+      let response = {
+        type: "handshake",
+        status: {
+          code: 100,
+          message: "continuing to phase 2",
+        },
+        data: {
+          //  - send new challenge
+          challenge,
+          signedChallenge,
+          signedKeypair,
+          //  - send signed ephemeral keypair, identity pubkey, and version
+          combinedKeypair,
+        }
+      }
+      this.connections[peerId].webrtc.handshakeStage = 3;
+      this.sendPacket(response,peerId)
+    } else if (stage == 2) {
+      this.connections[peerId].webrtc.handshakeStage = 4;
+      // Phase 2, client A
+      //  - verify signed keypair nonce timestamp with the identity key
+      let verified = this.cw.verifySignature(req.data.signedKeypair,
+                                             this.cw.hash(JSON.stringify(req.data.combinedKeypair)),
+                                             this.cw.getPubkeyFromId(peerId));
+      console.log("verified stage 2:",verified)
+      // console.log("their data", this.connections[peerId].webrtc);
+      if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
+        // BAD!!!
+        this.connections[peerId].connection.close();
+        console.log("signature doesn't match for peer",peerId)
+        alert("signature doesn't match for peer "+peerId)
+        this.connections[peerId].webrtc.handshakeStage = -1;
+        return;
+      }
+      let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
+      let theirPubkey = req.data.combinedKeypair.pubkey;
+      this.connections[peerId].webrtc.theirPublicKey = theirPubkey;
+      let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
+      this.connections[peerId].webrtc.sharedKey = sharedKey;
+      this.connections[peerId].webrtc.handshake.theirChallenge = req.data.challenge;
+      //  - verify challenge response
+      let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
+                                  === this.connections[peerId].webrtc.handshake.challenge;
+      // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
+      //                                       this.connections[peerId].webrtc.handshake.challenge,
+      //                                       this.cw.getPubkeyFromId(peerId));
+      //  - sign new challenge with ephemeral keypair
+      let signedChallenge = this.cw.encryptMessage(req.data.challenge, sharedKey);
+
+
+      let response = {
+        type: "handshake",
+        status: {
+          code: 100,
+          message: "continuing to phase 3",
+        },
+        data: {
+          //  - send challenge response
+          signedChallenge,
+        }
+      }
+      this.sendPacket(response,peerId);
+
+    } else  if (stage == 3) {
+      // console.log("their peer info:",this.connections[peerId].webrtc)
+      // Phase 3, client B
+      //  - verify challenge response
+      let ourKeypair = this.connections[peerId].webrtc.ourKeypair;
+      let theirPubkey = this.connections[peerId].webrtc.theirPublicKey;
+      let sharedKey = this.cw.getSharedKey(ourKeypair.privateKey, theirPubkey);
+      let challengeVerification = this.cw.decryptMessage(req.data.signedChallenge, sharedKey)
+                                  === this.connections[peerId].webrtc.handshake.challenge;
+      //  - send "handshake finished" (signed)
+      let response = {
+        type: "handshake",
+        status: {
+          code: 200,
+          message: "Connection open and ready",
+        },
+        data: { isFinished: true }
+      }
+      //  - mark connection as open and alive
+      this.connections[peerId].webrtc.open = true;
+      this.sendPacket(response,peerId);
+
+    } else if (stage == 4) {
+      if (!req.data.isFinished) {
+        console.log("something went wrong")
+        return;
+      }
+      this.connections[peerId].webrtc.open = true;
+      console.log("handshake finished")
+    }
+
+    // Phase 3, client A
+    //  - receive "handshake finished" (signed)
+    //  - mark connection as open and alive
+
+  }
   // this runs the specified handler with the inputs
   runHandler(type, peerId, req) {
     // checks to see if there is a callback that we stored from the message
