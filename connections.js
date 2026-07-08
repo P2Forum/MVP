@@ -376,7 +376,7 @@ class PeerConnectionManager {
       // we change the stage number so that we can use it to handle the handshake
       // requests elegantly -- if it's even, it's initator, if odd, it's not
       handshakeStage: isInitiator ? 2 : 1,
-      initiatedConnection: false,
+      initiatedConnection: isInitiator,
       theirPublicKey: null,
       theirIdentityKey: this.cw.getPubkeyFromId(peerId),
       //  - create ephemeral asymmetric keypair
