@@ -448,11 +448,19 @@ class PeerConnectionManager {
   // tries to disconnect from peerId in every available mode
   removeConnection(peerId) {
     // sends message to the peer
+    sendDirectMessage(new Message({type: "disconnect"}, "connection-update"), peerId);
+    this.connections[peerId].webrtc.connection.close();
+    this.connections.known_users[peerId].isAlive = false;
   }
 
   // lists all connected peers
   listConnections(peerId) {
-    
+    let out = [];
+    for (let peerId in this.connections.known_users) {
+      if (this.connections.known_users[peerId].isAlive) {
+        out.push(peerId);
+      }
+    }
   }
 
   // sends a Message to every connected peer
