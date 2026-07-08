@@ -287,7 +287,6 @@ class PeerConnectionManager {
   // anything.
   // Use with caution!
   sendPacket(packet, peerId) {
-    // .alive means the handshake has finished as well
     if (this.connections.known_users[peerId].isAlive) {
       this.connections[peerId].webrtc.connection.send(serialize(packet));
     }
@@ -334,6 +333,8 @@ class PeerConnectionManager {
     // When A connects to B, A is the initiator, B is not, since B is handling
     // the connection request, and A is sending it
     
+    if (this.connections[peerId]?.webrtc?.open)
+      return;
     let isInitiator = false;
     if (!dataConnection) {
       isInitiator = true;
@@ -466,6 +467,7 @@ class PeerConnectionManager {
     });
     dataConnection.on('close', () => {
       this.connections[peerId].webrtc.open = false;
+      this.connections[peerId].webrtc.handshakeStage = 0;
       console.log("closing")
     });
   }
@@ -517,7 +519,7 @@ class PeerConnectionManager {
     // if you add iroh support, just add another check on iroh
     // here we check the handshake for webrtc
     // if iroh is incomplete, add a check there
-    if (connection.webrtc.handshakeStage <5) {
+    if (connection.webrtc.open) {
       console.log("handshake incomplete!");
       return;
     }
