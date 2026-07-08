@@ -59,7 +59,7 @@ class CryptoWrapper {
   }
 
   // Verify signature using sender's public key
-  verifySignature(signature, message, senderPublicKey) {
+  verifySignature(signature, message, senderPublicKey = this.identityKeypair.publicKey) {
     return this._s.crypto_sign_verify_detached(signature, message, senderPublicKey);
   }
 

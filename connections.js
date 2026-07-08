@@ -576,35 +576,4 @@ class Message {
   getCallback() {
     return {callback: this.callback, callbackId: this.callbackId};
   }
-  // obsolete code:
-  getPackets() {
-    const packets = [];
-    Object.keys(this.channel.peers).forEach(peerId => {
-      const connection = this.wrappedPeerObj.connections[peerId];
-      if (!connection.open) return;
-      const callbackId = sodium.to_base64(sodium.randombytes_buf(64));
-      connection.callbacks ??= {};
-      connection.callbacks[callbackId] = this.callback;
-      const {encrypted, nonce} = cw.encryptMessage(JSON.stringify(this.data), connection.theirPublicKey, connection.ourKeyPair.privateKey);
-      packets.push([peerId, {
-        type: this.type,
-        encrypted: sodium.to_base64(encrypted),
-        nonce: sodium.to_base64(nonce),
-        signatures: {
-          encrypted: sodium.to_base64(cw.signMessage(encrypted)),
-          nonce: sodium.to_base64(cw.signMessage(nonce))
-        },
-        isEncrypted: true,
-        callbackId: this.callbackId,
-        returnCallback: this.returnCallback,
-        status: this.status,
-        channel: {
-          id: this.channelId,
-          creationDate: this.channel.creationDate,
-          name: this.channel.name,
-          description: this.channel.description,
-          peers: this.Math.abs(channel.peers
-        }
-      }]))
-    });
 }
