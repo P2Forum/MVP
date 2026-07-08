@@ -152,7 +152,7 @@ class PeerConnectionManager {
                                              this.cw.getPubkeyFromId(peerId));
       console.log("verified stage 2:",verified)
       // console.log("their data", this.connections[peerId].webrtc);
-      if (!verified && connectionTime - req.data.combinedKeypair.connectionTime < 2000 /* 2sec difference allowed*/) {
+      if (!verified || Math.abs(connectionTime - req.data.combinedKeypair.connectionTime) > 2000 /* 2sec difference allowed*/) {
         // BAD!!!
         this.connections[peerId].webrtc.connection.close();
         console.log("signature doesn't match for peer",peerId)
@@ -174,6 +174,7 @@ class PeerConnectionManager {
         console.log("challenge verification failed! - Aborting!")
         alert("challenge verification failed! - Aborting!")
         this.connections[peerId].webrtc.handshakeStage = -1;
+        return;
       }
       // let challengeVerification = this.cw.verifySignature(req.data.signedChallenge,
       //                                       this.connections[peerId].webrtc.handshake.challenge,
@@ -210,6 +211,7 @@ class PeerConnectionManager {
         console.log("challenge verification failed! - Aborting!")
         alert("challenge verification failed! - Aborting!")
         this.connections[peerId].webrtc.handshakeStage = -1;
+        return;
       }
       //  - send "handshake finished" (signed)
       let response = {
@@ -223,6 +225,7 @@ class PeerConnectionManager {
       //  - mark connection as open and alive
       this.connections[peerId].webrtc.open = true;
       this.sendPacket(response,peerId);
+      this.connections[peerId].webrtc.handshakeStage = 5;
 
     } else if (stage === 4) {
       if (!req.data.isFinished) {
@@ -230,7 +233,8 @@ class PeerConnectionManager {
         return;
       }
       this.connections[peerId].webrtc.open = true;
-      console.log("handshake finished")
+      console.log("handshake finished");
+      this.connections[peerId].webrtc.handshakeStage = 5;
     }
 
     // Phase 3, client A
@@ -513,7 +517,7 @@ class PeerConnectionManager {
     // if you add iroh support, just add another check on iroh
     // here we check the handshake for webrtc
     // if iroh is incomplete, add a check there
-    if (connection.webrtc.handshakeStage <3) {
+    if (connection.webrtc.handshakeStage <5) {
       console.log("handshake incomplete!");
       return;
     }
