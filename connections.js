@@ -519,7 +519,7 @@ class PeerConnectionManager {
     // if you add iroh support, just add another check on iroh
     // here we check the handshake for webrtc
     // if iroh is incomplete, add a check there
-    if (connection.webrtc.open) {
+    if (!connection.webrtc.open) {
       console.log("handshake incomplete!");
       return;
     }
