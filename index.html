@@ -1,12 +1,43 @@
 <head>
 
-<script src="./lib.js"></script>
-<script src="./crypto.js"></script>
-<script src="./db.js"></script>
-<script src="./connections.js"></script>
+  <!-- global vars -->
+  <script>var USERDATA, MASTER_KEY, VERSION, fs, cw, userPeer, sodium, originalDoc;</script>
+  <!-- debug vars -->
+  <script>var A,B;</script>
+
+  <!-- dependencies -->
+  <script src="./dependencies/peerjs.min.js"></script>
+  <script src="./dependencies/sodium.js"></script>
+
+
+  <!-- scripts for our libs and stuff -->
+  <script src="./lib.js"></script>
+  <script src="./crypto.js"></script>
+  <script src="./db.js"></script>
+  <script src="./connections.js"></script>
+
+  <!-- preloading stuff -->
+  <script>
+    window.init = async () => {
+      await sleep(500)
+      cw = new CryptoWrapper(sodium);
+      console.log("init main stuff")
+      //userPeer = new PeerConnectionManager()
+      console.log("A")
+      A = new PeerConnectionManager()
+      console.log("B")
+      B = new PeerConnectionManager()
+      //put your init function here
+    }
+    window.init()
+  </script>
+
+  <!-- init scripts and stuff go here -->
+  <script src="./init.js"></script>
 
 </head>
 
 <body>
+test
 
 </body>
