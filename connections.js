@@ -607,8 +607,4 @@ class Message {
         }
       }]))
     });
->   return packets|if (!challengeVerification) {
-  // BAD!!
-  console.log("challenge verification failed! - Aborting!")
-  console.log("challenge verification failed! - Aborting!")
 }
