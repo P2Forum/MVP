@@ -70,7 +70,16 @@ class PeerConnectionManager {
       },
       'ping': (peerId, req) => {
         console.log('got ping from', peerId);
-      }
+      },
+      // this is to test callbacks, it will pretty much just ping back
+      'test': (peerId, req) => {
+        console.log("testing... data: ", peerId, req);
+        if (req.data.done) {
+          console.log("testing thing done");
+          return;
+        }
+        this.sendMessage(new Message({done: true}, "test", {code: 200, message: "testing callbacks"}, false, req.callback, (data) => {console.log("GOT CALLBACK", data)}))
+      },
     }
   }
 
@@ -220,7 +229,13 @@ class PeerConnectionManager {
   // this runs the specified handler with the inputs
   runHandler(type, peerId, req) {
     // checks to see if there is a callback that we stored from the message
-    if (req.returnCallback && this.connections[peerId].callbacks[req.returnCallback]) {
+    if (req.returnCallback
+        && this.connections[peerId].callbacks[req.returnCallback]
+        // make sure that it is a callback we told them, to prevent spoofing
+        // && this.cw.verifySignature(req.data.returnCallback.clear,
+        //                         req.data.returnCallback.sig,
+        //                         this.identityKeypair.publicKey)
+         ) {
       // run the callback
       this.connections[peerId].callbacks[req.returnCallback](req);
       // remove the callback
@@ -338,6 +353,7 @@ class PeerConnectionManager {
     let combinedKeypair = { pubkey: ourKeypair.publicKey, nonce, connectionTime };
     let signedKeypair = this.cw.signMessage(this.cw.hash(JSON.stringify(combinedKeypair)));
     this.connections[peerId] ??= {};
+    this.connections[peerId].callbacks = {};
     this.connections[peerId].webrtc = {
       connection: dataConnection,
       // we change the stage number so that we can use it to handle the handshake
@@ -449,7 +465,7 @@ class PeerConnectionManager {
   // tries to disconnect from peerId in every available mode
   removeConnection(peerId) {
     // sends message to the peer
-    sendDirectMessage(new Message({type: "disconnect"}, "connection-update"), peerId);
+    this.sendDirectMessage(new Message({type: "disconnect"}, "connection-update"), peerId);
     this.connections[peerId].webrtc.connection.close();
     this.connections.known_users[peerId].isAlive = false;
   }
@@ -489,6 +505,11 @@ class PeerConnectionManager {
       console.log("handshake incomplete!");
       return;
     }
+    if (msgObj.hasCallback) {
+      // add a callback if it exists
+      let {callback, callbackId} = msgObj.getCallback();
+      connection.callbacks[callbackId] = callback;
+    }
     this.sendPacket(msgObj.toPacket(), peerId);
     
   }
@@ -500,13 +521,21 @@ class Message {
   // data is the actual data being sent
   // type is what type, such as 'handshake', 'newCategory', etc
   // status is a numerical descriptive status, and a verbose text status
-  // returnCallback is whether or not it should run code when a response is returned
+  // hasCallback is whether or not it should run code when a response is returned
+  // returnCallback is the callback that it is replying to. 
   // callback is the code to run
   // wrappedPeerObj is the peer to do things to
+  //
+  // Example of callbacks:
+  // A sends message to B, but wants to run code on the reply
+  // A sets hasCallback to true, and sets callback to the code to run
+  // B receives the data, then replies, setting returnCallback to be the
+  // id given by A
   constructor(data,
               type = 'message',
               status = {code: 200, message: "OK"},
-              returnCallback = false,
+              hasCallback = false,
+              returnCallback = null,
               callback = (data) => {console.log("received callback", data)},
               wrappedPeerObj = userPeer) {
     this.data = data;
@@ -519,13 +548,21 @@ class Message {
     this.cw = wrappedPeerObj?.cw || cw;
     this.callbackId = this.cw.b64RandomBytes(64);
     this.returnCallback = returnCallback;
+    this.hasCallback = hasCallback;
   }
   toPacket() {
     return {
       type: this.type,
       status: this.status,
       data: this.data,
-    }
+      // callback is the callback that we want to run code for
+      callback: this.hasCallback ? this.callbackId : null,
+      // returnCallback is telling the recipient to run *their* callback code
+      returnCallback: this.returnCallback,
+    };
+  }
+  getCallback() {
+    return {callback: this.callback, callbackId: this.callbackId};
   }
   // obsolete code:
   getPackets() {
