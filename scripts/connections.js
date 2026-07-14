@@ -43,6 +43,11 @@ class PeerConnectionManager {
       "IDENTITY_KEY": this.cw.newIdentityKeypair(),
       "webrtc": {
         "known_users": {}
+      },
+      options: {
+        host: "localhost",
+        port: 9000,
+        path: "/",
       }
     }
   }
@@ -51,6 +56,7 @@ class PeerConnectionManager {
   // runs init scripts for connecting to every peer
   // creates local peer object so that it can do things
   initWebRTC(userdata) {
+    console.log(userdata.options)
     this.connections = {};
     this.peer.webrtc = new Peer(this.id, userdata.options)
     // If you have weird issues, this may be a pass by reference not value,
